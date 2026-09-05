@@ -1,0 +1,1 @@
+throw new Error("This unpublished workflow file dependency cannot be packed portably. On Linux x64 use npm run pack:linux-x64-release -- OUTPUT_DIRECTORY for an explicitly platform-specific local release. Do not publish it.");

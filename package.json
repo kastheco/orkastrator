@@ -13,7 +13,9 @@
     "extensions/orkastrator-workflows",
     ".pi/workflows",
     "patches",
+    "vendor",
     "scripts/apply-patches.mjs",
+    "scripts/guard-unpublished-pack.mjs",
     "README.md"
   ],
   "engines": {
@@ -39,6 +41,8 @@
     ]
   },
   "scripts": {
+    "prepack": "node scripts/guard-unpublished-pack.mjs",
+    "pack:linux-x64-release": "node scripts/pack-linux-x64-release.mjs",
     "test:extension": "node --experimental-strip-types --test extensions/orkastrator-workflows/tests/*.test.ts",
     "test:decision-runtime": "node scripts/test-decision-questionnaire-runtime.mjs",
     "test:orkastrator": "npm run test:extension && npm run test:decision-runtime && npm run test:cook-lifecycle",
@@ -56,7 +60,7 @@
   },
   "dependencies": {
     "@juicesharp/rpiv-ask-user-question": "2.9.0",
-    "@osolmaz/pi-workflows": "0.16.0",
+    "@osolmaz/pi-workflows": "file:vendor/osolmaz-pi-workflows-0.16.0-kas.769.3.tgz",
     "patch-package": "^8.0.1",
     "tsx": "^4.23.13"
   },

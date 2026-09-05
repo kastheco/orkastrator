@@ -17,6 +17,45 @@ orkastrator is an opinionated software delivery policy and workflow suite for pi
 - [`pi-subagents`](https://www.npmjs.com/package/pi-subagents) or [`pi-herdr-subagents`](https://github.com/brkastner/pi-herdr-subagents) runs reviewers and scoped fixers.
 - orkastrator supplies the delivery workflows and policy: planning and implementation composition, immutable findings, bounded write authority, parallel repair groups, scoped re-review, serial integration, and owner gates.
 
+## KAS769 local candidate distribution (not live)
+
+This branch pins the exact customized host `0.16.0-kas.769.3` in
+`vendor/osolmaz-pi-workflows-0.16.0-kas.769.3.tgz` (SHA256
+`1517d6fb98342627cc2bc0a64f56bbe6f78c9fee1b693eb4dec4d2ee281668a4`).
+Normal checkout `npm ci` works; postinstall retains the rpiv2.9.0 patch
+(`a2a800c428bf149cda45e0740e7c225d8fdba6ffed393f537da16268d3386917`).
+Only the incorporated workflow patch is retired. No live install is implied.
+
+**Temporary distribution limitation:** ordinary `npm pack` fails with guidance:
+npm cannot resolve this unpublished nested file tarball before extraction.
+There is no portable/published replacement. From this source checkout only:
+
+```sh
+npm run pack:linux-x64-release -- /absolute/local/output
+ORKASTRATOR_PACKAGE_MODE=linux-x64 npm run test:extension
+```
+
+The explicit command creates a disposable fresh install and bundles the host
+only in its staging manifest. It audits paths, dependencies and links before
+copying the release tarball/receipt to the requested output. Source manifest and
+lock remain unchanged. Never publish this local release. It includes esbuild's
+Linux-x64 executable, so Windows/macOS/other architectures are **not supported
+by this release artifact**. Included host dependencies are better-sqlite3,
+node-addon-api, jiti, tsx, esbuild and @esbuild/linux-x64. better-sqlite3 ships
+upstream multi-platform N-API prebuilds, which load on Node22.22.2 and24.20.0
+without rebuilding. An esbuild internal hardlink is materialized as a regular
+file in staging, preserving bytes/mode, because npm extraction drops it.
+
+The explicit release-mode tests install the tarball into fresh npm/pnpm
+consumers offline from warmed package caches (pnpm copies files, not external
+store links), verify exact host source/dist against the included archive,
+load SQLite and the host APIs, and preserve questionnaire/customization checks.
+The loader test resolves the declared tsx dependency from the installed package,
+not an assumed root-hoisted loader. Normal-pack guard and file inventory are
+separate tests. Without release mode, the portable install test is explicitly
+skipped rather than falsely claiming portable publication. Client quiescence,
+production scopes, stopped-writer backups and independent review still block cutover.
+
 ## install and run
 
 install orkastrator with `pi-subagents` for ClickClack and other desktop sessions:

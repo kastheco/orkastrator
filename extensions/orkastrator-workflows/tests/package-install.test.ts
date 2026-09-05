@@ -8,8 +8,13 @@ import { promisify } from "node:util";
 
 const execFileAsync = promisify(execFile);
 const projectRoot = resolve(import.meta.dirname, "../../..");
+const linuxRelease = process.env.ORKASTRATOR_PACKAGE_MODE === "linux-x64";
 
-test("the packed package resolves one patched pi-workflows client under npm and pnpm", async () => {
+test("normal pack rejects the unpublished file dependency with local-release guidance", async () => {
+  await assert.rejects(execFileAsync("npm", ["pack", "--dry-run"], { cwd: projectRoot }), /pack:linux-x64-release/);
+});
+
+test(linuxRelease ? "Linux x64 release resolves the exact customized host under npm and pnpm" : "portable packed package resolves one patched pi-workflows client under npm and pnpm", { skip: linuxRelease ? false : "Unpublished file dependency: portable packing guarded; run ORKASTRATOR_PACKAGE_MODE=linux-x64 npm run test:extension for local release consumers" }, async () => {
   const root = await mkdtemp(join(tmpdir(), "orkastrator-package-install-"));
   const packed = join(root, "packed");
   const consumer = join(root, "consumer");
@@ -19,9 +24,9 @@ test("the packed package resolves one patched pi-workflows client under npm and 
     await mkdir(consumer, { recursive: true });
     await mkdir(pnpmConsumer, { recursive: true });
     const { stdout } = await execFileAsync(
-      "npm",
-      ["pack", "--json", "--pack-destination", packed],
-      { cwd: projectRoot, encoding: "utf8", timeout: 60_000 },
+      process.execPath,
+      ["scripts/pack-linux-x64-release.mjs", packed],
+      { cwd: projectRoot, encoding: "utf8", timeout: 180_000 },
     );
     const result = JSON.parse(stdout) as Array<{ filename: string }>;
     assert.equal(result.length, 1);
@@ -42,6 +47,7 @@ test("the packed package resolves one patched pi-workflows client under npm and 
       "npm",
       [
         "install",
+        "--offline",
         "--omit=dev",
         "--legacy-peer-deps",
         "--no-package-lock",
@@ -51,14 +57,15 @@ test("the packed package resolves one patched pi-workflows client under npm and 
       ],
       { cwd: consumer, encoding: "utf8", timeout: 120_000 },
     );
+    const loader = await execFileAsync(process.execPath, ["--input-type=module", "-e", "import { createRequire } from 'node:module'; import { realpathSync } from 'node:fs'; import { pathToFileURL } from 'node:url'; const root = createRequire(import.meta.url); const ork = createRequire(root.resolve('orkastrator-pi/package.json')); const loader = realpathSync(ork.resolve('tsx')); if (!loader.startsWith(realpathSync(process.cwd()) + '/')) throw new Error('Loader escaped consumer'); console.log(pathToFileURL(loader).href)"], { cwd: consumer, encoding: "utf8" });
     const imported = await execFileAsync(
       process.execPath,
       [
         "--import",
-        "tsx",
+        loader.stdout.trim(),
         "--input-type=module",
         "-e",
-        "import { readFileSync } from 'node:fs'; import { createRequire } from 'node:module'; import { dirname, resolve } from 'node:path'; import { pathToFileURL } from 'node:url'; const rootRequire = createRequire(import.meta.url); const orkRequire = createRequire(rootRequire.resolve('orkastrator-pi/package.json')); const workflowPath = orkRequire.resolve('@osolmaz/pi-workflows'); const workflowRoot = resolve(dirname(workflowPath), '../..'); const workflows = await import(pathToFileURL(workflowPath).href); const extension = await import(pathToFileURL(orkRequire.resolve('@osolmaz/pi-workflows/extension')).href); const questionnaire = await import(pathToFileURL(orkRequire.resolve('@juicesharp/rpiv-ask-user-question')).href); const client = await import(pathToFileURL(orkRequire.resolve('@osolmaz/pi-workflows/client')).href); const workerStore = readFileSync(resolve(workflowRoot, 'dist/host/worker-store.js'), 'utf8'); const autodoc = readFileSync(resolve(workflowRoot, 'dist/builtins/autodoc.workflow.js'), 'utf8'); const runStore = readFileSync(resolve(workflowRoot, 'dist/workflows/store.js'), 'utf8'); console.log([workflowPath === rootRequire.resolve('@osolmaz/pi-workflows'), typeof client.WorkflowClient, typeof workflows.readWorkflowRun, typeof extension.registerWorkflowHumanDecisionPresenter, typeof questionnaire.presentQuestionnaire, workerStore.includes('return scope === null ? undefined : scope;'), autodoc.includes('function inspectionRepository'), runStore.includes('UPDATE runs SET input_hash = ? WHERE run_id = ?')].join(','))",
+        "import { readFileSync } from 'node:fs'; import { createRequire } from 'node:module'; import { dirname, resolve } from 'node:path'; import { pathToFileURL } from 'node:url'; const rootRequire = createRequire(import.meta.url); const orkRequire = createRequire(rootRequire.resolve('orkastrator-pi/package.json')); const workflowPath = orkRequire.resolve('@osolmaz/pi-workflows'); const workflowRoot = resolve(dirname(workflowPath), '../..'); const workflows = await import(pathToFileURL(workflowPath).href); const extension = await import(pathToFileURL(orkRequire.resolve('@osolmaz/pi-workflows/extension')).href); const questionnaire = await import(pathToFileURL(orkRequire.resolve('@juicesharp/rpiv-ask-user-question')).href); const client = await import(pathToFileURL(orkRequire.resolve('@osolmaz/pi-workflows/client')).href); const workerStore = readFileSync(resolve(workflowRoot, 'dist/host/worker-store.js'), 'utf8'); const autodoc = readFileSync(resolve(workflowRoot, 'dist/builtins/autodoc.workflow.js'), 'utf8'); const runStore = readFileSync(resolve(workflowRoot, 'dist/workflows/store.js'), 'utf8'); console.log([JSON.parse(readFileSync(resolve(workflowRoot, 'package.json'), 'utf8')).version === '0.16.0-kas.769.3', typeof client.WorkflowClient, typeof workflows.readWorkflowRun, typeof extension.registerWorkflowHumanDecisionPresenter, typeof questionnaire.presentQuestionnaire, workerStore.includes('return scope === null ? undefined : scope;'), autodoc.includes('function inspectionRepository'), runStore.includes('UPDATE runs SET input_hash = ? WHERE run_id = ?')].join(','))",
       ],
       { cwd: consumer, encoding: "utf8", timeout: 30_000 },
     );
@@ -87,7 +94,7 @@ test("the packed package resolves one patched pi-workflows client under npm and 
     ].join("\n"), "utf8");
     await execFileAsync(
       "pnpm",
-      ["install", "--no-frozen-lockfile"],
+      ["install", "--offline", "--package-import-method=copy", "--no-frozen-lockfile"],
       { cwd: pnpmConsumer, encoding: "utf8", timeout: 120_000 },
     );
     const pnpmImported = await execFileAsync(
@@ -100,6 +107,10 @@ test("the packed package resolves one patched pi-workflows client under npm and 
       { cwd: pnpmConsumer, encoding: "utf8", timeout: 30_000 },
     );
     assert.equal(pnpmImported.stdout.trim(), "true,true");
+    for (const cwd of [consumer, pnpmConsumer]) {
+      const verified = await execFileAsync(process.execPath, [resolve(projectRoot, "scripts/verify-linux-release-consumer.mjs"), cwd], { cwd, encoding: "utf8", timeout: 30_000 });
+      console.log(verified.stdout.trim());
+    }
   } finally {
     await rm(root, { recursive: true, force: true });
   }
